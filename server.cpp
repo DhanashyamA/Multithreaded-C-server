@@ -7,20 +7,18 @@
 #include <fstream>
 #include <sstream>
 
-// Import our custom headers
+
 #include "threadpool.hpp"
 #include "thread_safe_cache.hpp"
 
 using namespace std;
 
 const int PORT = 8080;
-
-// Instantiate the global memory cache
 ThreadSafeCache fileCache;
 
-// Helper function to read raw files from the hard drive
+
 string readFileFromDisk(const string& filepath) {
-    // We assume static files live in a folder named 'public'
+    
     ifstream file("public" + filepath); 
     if (!file.is_open()) return "";
     
@@ -33,27 +31,25 @@ string readFileFromDisk(const string& filepath) {
 void handle_client(int client_socket) {
     char buffer[4096] = {0};
     read(client_socket, buffer, 4096);
-
-    // 1. Basic HTTP Parsing (Extracting the requested path)
     string request(buffer);
     string method, path, protocol;
     istringstream request_stream(request);
     request_stream >> method >> path >> protocol;
 
-    // Route default '/' to 'index.html'
+
     if (path == "/") path = "/index.html"; 
 
     string response_body;
     string http_status = "200 OK";
 
-    // 2. Try the Memory Cache (The C++17 Optimization)
+
     auto cached_file = fileCache.getFile(path);
     
     if (cached_file.has_value()) {
         response_body = cached_file.value();
         cout << "[Thread " << this_thread::get_id() << "] CACHE HIT: " << path << "\n";
     } else {
-        // 3. Cache Miss: Fall back to slow Disk I/O
+
         response_body = readFileFromDisk(path);
         
         if (response_body.empty()) {
@@ -61,13 +57,12 @@ void handle_client(int client_socket) {
             response_body = "<h1>404 Error: File Not Found</h1>";
             cout << "[Thread " << this_thread::get_id() << "] 404 ERROR: " << path << "\n";
         } else {
-            // Success! Save it to RAM so the next user gets it instantly.
             fileCache.saveFile(path, response_body);
             cout << "[Thread " << this_thread::get_id() << "] CACHE MISS (Loaded from disk): " << path << "\n";
         }
     }
 
-    // 4. Construct and send the HTTP Response
+
     string http_response = "HTTP/1.1 " + http_status + "\r\n"
                            "Content-Type: text/html\r\n"
                            "Content-Length: " + to_string(response_body.length()) + "\r\n"
@@ -107,20 +102,17 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    cout << "🚀 Multithreaded C++ Server running on http://localhost:" << PORT << "\n";
+    cout << "Multithreaded C++ Server running on local host" << PORT << "\n";
 
-    // 4. Initialize the Thread Pool (e.g., 8 Worker Threads)
     ThreadPool pool(8);
 
-    // 5. The Boss Thread (Infinite Accept Loop)
     while (true) {
         int client_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
         if (client_socket < 0) {
-            perror("Accept failed");
+            perror("falied");
             continue;
         }
 
-        // The Boss tosses the new client to the Worker Queue
         pool.enqueue([client_socket]() {
             handle_client(client_socket);
         });
